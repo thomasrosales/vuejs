@@ -24,6 +24,10 @@ class CenterService {
     return axiosInstance.get(`${URL_CENTER}/kind`).then((response) => response)
   }
 
+  async getAppointments (centerId, date) {
+    return axiosInstance.get(`${URL_CENTER}/${centerId}/appointments/${date}`).then((response) => response)
+  }
+
   async loadNewCenter (center) {
     return axios.post(
       `${URL_CENTER}/new`,

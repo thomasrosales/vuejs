@@ -2,59 +2,88 @@
   <div>
     <!-- Content here -->
     <b-row>
-        <b-col>
-          <h1>Solicitud de Turno</h1>
-          <p>Para el centro: {{getCenterName}}</p>
-          <hr>
-        </b-col>
+      <b-col>
+        <h1>Solicitud de Turno</h1>
+        <p>Para el centro: {{ getCenterName }}</p>
+        <hr />
+      </b-col>
     </b-row>
     <b-row>
-        <b-col>
-            <!-- https://es.vuejs.org/v2/cookbook/form-validation.html -->
-            <b-form @submit="onSubmit" novalidate="novalidate">
+      <b-col>
+        <!-- https://es.vuejs.org/v2/cookbook/form-validation.html -->
+        <b-form @submit="onSubmit" novalidate="novalidate">
+          <!-- Name -->
 
-            <!-- Name -->
+          <b-form-group
+            id="input-group-1"
+            label="Fecha del turno:"
+            label-for="input-1"
+          >
+            <b-form-datepicker
+              id="example-datepicker"
+              v-model="form.date"
+              class="mb-2"
+            ></b-form-datepicker>
+          </b-form-group>
 
-            <b-form-group id="input-group-1" label="Nombre del Centro:" label-for="input-1">
-              <b-form-datepicker id="example-datepicker" v-model="form.date" class="mb-2"></b-form-datepicker>
-            </b-form-group>
+          <!-- Hours -->
 
-             <!-- Telephone -->
-
-            <b-form-group id="input-group-2" label="Teléfono:" label-for="input-2">
-                <b-form-input
-                id="input-2"
-                v-model="form.telephone"
-                required
-                placeholder="+5422.."
-                ></b-form-input>
-            </b-form-group>
-
-            <!-- Email -->
-
-            <b-form-group
-                id="input-group-3"
-                label="Email:"
-                label-for="input-3"
+          <b-form-group
+            id="input-group-hours"
+            label="Seleccione un turno disponible:"
+            label-for="input-hours"
+            v-show="form.date !== null"
+          >
+            <b-form-radio
+              v-for="(available, hour) in form.hours.appointments"
+              :key="hour"
+              name="some-radios"
+              :disabled="available == false"
+              value=hour
+              v-on:change="apptSelected(hour)"
+              >
+              {{ hour }}</b-form-radio
             >
-                <b-form-input
-                id="input-3"
-                v-model="form.email"
-                type="email"
-                required
-                placeholder="Ingrese su email"
-                ></b-form-input>
-            </b-form-group>
+          </b-form-group>
 
-            <br>
+          <!-- Telephone -->
 
-            <b-button type="submit" variant="primary" class="mr-1">Submit</b-button>
-            <b-button type="reset" variant="danger">Reset</b-button>
-            </b-form>
+          <b-form-group
+            id="input-group-2"
+            label="Teléfono:"
+            label-for="input-2"
+          >
+            <b-form-input
+              id="input-2"
+              v-model="form.telephone"
+              required
+              placeholder="+5422.."
+            ></b-form-input>
+          </b-form-group>
 
-            <br>
-            <br>
-        </b-col>
+          <!-- Email -->
+
+          <b-form-group id="input-group-3" label="Email:" label-for="input-3">
+            <b-form-input
+              id="input-3"
+              v-model="form.email"
+              type="email"
+              required
+              placeholder="Ingrese su email"
+            ></b-form-input>
+          </b-form-group>
+
+          <br />
+
+          <b-button type="submit" variant="primary" class="mr-1"
+            >Submit</b-button
+          >
+          <b-button type="reset" variant="danger">Reset</b-button>
+        </b-form>
+
+        <br />
+        <br />
+      </b-col>
     </b-row>
   </div>
 </template>
@@ -64,6 +93,10 @@
 // VUEX
 
 import { mapGetters } from 'vuex'
+
+import CenterService from '@/providers/center.services.js'
+
+const centerService = new CenterService()
 
 // COMPONENTS
 
@@ -86,7 +119,27 @@ export default {
       form: {
         email: '',
         telephone: '',
-        date: null
+        date: null,
+        appointment: '',
+        hours: {
+          appointments: {
+            '09:00': true,
+            '09:30': false,
+            '10:00': true,
+            '10:30': true,
+            '11:00': false,
+            '11:30': true,
+            '12:00': true,
+            '12:30': true,
+            '13:00': true,
+            '13:30': true,
+            '14:00': false,
+            '14:30': true,
+            '15:00': true,
+            '15:30': true
+          },
+          day: '2020-11-11'
+        }
       },
       errors: []
     }
@@ -95,6 +148,17 @@ export default {
     ...mapGetters(['getCenterName', 'getCenter'])
   },
   components: {
+  },
+  watch: {
+    'form.date': {
+      handler: function (val) {
+        const formattedDate = this.$moment(val).format('DD/MM/YYYY')
+        centerService.getAppointments(this.$route.params.id, formattedDate).then((data) => {
+          console.log(data.data)
+          console.log(formattedDate)
+        })
+      }
+    }
   },
   methods: {
     onSubmit (evt) {
@@ -138,7 +202,17 @@ export default {
     validEmail: function (email) {
       var re = /^(([^<>()\]\\.,;:\s@"]+(\.[^<>()\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,24}))$/
       return re.test(email)
+    },
+    apptSelected (value) {
+      this.form.appointment = value
+      this.$alertify.success(this.form.appointment)
     }
+    /*
+    getAppointments () {
+      centerService.getAppointments(this.$route.params.id, '29/11/2020').then((data) => {
+      })
+    }
+    */
     /*
     handleFileUpload () {
       this.file = this.$refs.file.files[0]
@@ -151,8 +225,9 @@ export default {
       this.$router.push({ path: '/centers' })
     }
     setTimeout(() => {
-      this.$alertify.success('Hell Alertify')
+      this.$alertify.success('')
     }, 500)
+    // this.getAppointments()
   }
 }
 </script>
