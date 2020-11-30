@@ -12,8 +12,8 @@ const axiosInstance = axios.create({
 const URL_CENTER = process.env.VUE_APP_URL_API + '/center'
 
 class AppointmentService {
-  async getAppointments (centerId, day, month, year) {
-    return axiosInstance.get(`${URL_CENTER}/${centerId}/appointments/${day}/${month}/${year}`).then((response) => response)
+  async getAppointments (centerId, date) {
+    return axiosInstance.get(`${URL_CENTER}/${centerId}/appointments/${date}`).then((response) => response)
   }
 
   async loadNewAppointment (appointment, centerId) {
@@ -21,7 +21,7 @@ class AppointmentService {
       `${URL_CENTER}/${centerId}/book`,
       appointment,
       {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'application/json' }
       }
     ).then(response => {
       return response

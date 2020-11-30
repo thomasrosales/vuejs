@@ -11,7 +11,7 @@
     <b-row>
       <b-col>
         <!-- https://es.vuejs.org/v2/cookbook/form-validation.html -->
-        <b-form @submit="onSubmit" novalidate="novalidate">
+        <b-form @submit="onSubmit" @reset="onReset">
           <!-- Name -->
 
           <b-form-group
@@ -23,7 +23,12 @@
               id="example-datepicker"
               v-model="form.date"
               class="mb-2"
+              :state="datePickedCorrect"
+              aria-describedby="input-live-feedback"
             ></b-form-datepicker>
+            <b-form-invalid-feedback id="input-live-feedback">
+              La fecha seleccionada tiene que ser igual o posterior a hoy
+            </b-form-invalid-feedback>
           </b-form-group>
 
           <!-- Hours -->
@@ -32,10 +37,10 @@
             id="input-group-hours"
             label="Seleccione un turno disponible:"
             label-for="input-hours"
-            v-show="form.date !== null"
+            v-show="form.date !== null && appointments !== null && datePickedCorrect"
           >
             <b-form-radio
-              v-for="(available, hour) in form.hours.appointments"
+              v-for="(available, hour) in appointments"
               :key="hour"
               name="some-radios"
               :disabled="available == false"
@@ -56,9 +61,14 @@
             <b-form-input
               id="input-2"
               v-model="form.telephone"
+              :state="telephoneLenght"
               required
+              aria-describedby="input-live-feedback"
               placeholder="+5422.."
             ></b-form-input>
+            <b-form-invalid-feedback id="input-live-feedback">
+              El telefono debe tener al menos 6 numeros
+            </b-form-invalid-feedback>
           </b-form-group>
 
           <!-- Email -->
@@ -94,9 +104,9 @@
 
 import { mapGetters } from 'vuex'
 
-import CenterService from '@/providers/center.services.js'
+import AppointmentService from '@/providers/appointment.services'
 
-const centerService = new CenterService()
+const appointmentService = new AppointmentService()
 
 // COMPONENTS
 
@@ -120,104 +130,103 @@ export default {
         email: '',
         telephone: '',
         date: null,
-        appointment: '',
-        hours: {
-          appointments: {
-            '09:00': true,
-            '09:30': false,
-            '10:00': true,
-            '10:30': true,
-            '11:00': false,
-            '11:30': true,
-            '12:00': true,
-            '12:30': true,
-            '13:00': true,
-            '13:30': true,
-            '14:00': false,
-            '14:30': true,
-            '15:00': true,
-            '15:30': true
-          },
-          day: '2020-11-11'
-        }
+        hour: '',
+        center_id: Number
       },
-      errors: []
+      errors: [],
+      appointments: null
     }
   },
   computed: {
-    ...mapGetters(['getCenterName', 'getCenter'])
+    ...mapGetters(['getCenterName', 'getCenter']),
+    telephoneLenght () {
+      if (this.form.telephone.length === 0) {
+        return null
+      }
+      if (this.form.telephone.length > 5) {
+        return true
+      } else {
+        return false
+      }
+    },
+    datePickedCorrect () {
+      if (this.form.date === null) {
+        return null
+      }
+      if (!this.$moment(this.form.date, 'YYYY-MM-DD').isSameOrAfter(this.$moment(new Date()).format('YYYY-MM-DD'))) {
+        return false
+      } else {
+        return true
+      }
+    }
   },
   components: {
   },
   watch: {
     'form.date': {
       handler: function (val) {
-        const formattedDate = this.$moment(val).format('DD/MM/YYYY')
-        centerService.getAppointments(this.$route.params.id, formattedDate).then((data) => {
-          console.log(data.data)
-          console.log(formattedDate)
-        })
+        if (val !== null) {
+          const formattedDate = this.$moment(val).format('DD/MM/YYYY')
+          appointmentService.getAppointments(this.$route.params.id, formattedDate).then((data) => {
+            this.appointments = data.data.appointments
+            console.log(this.appointments)
+          })
+        }
       }
     }
   },
   methods: {
     onSubmit (evt) {
       evt.preventDefault()
-      this.errors = []
-      const today = this.$moment(new Date()).format('YYYY-MM-DD')
-
-      if (!this.form.email) {
-        this.errors.push('El correo electrónico es obligatorio.')
-      } else if (!this.validEmail(this.form.email)) {
-        this.errors.push('El correo electrónico debe ser válido.')
-      }
-      if (!this.form.telephone) {
-        this.errors.push('El teléfono es obligatorio.')
-      }
-      if (this.form.data === null) {
-        this.errors.push('La fecha es obligatoria.')
-      } else if (!this.$moment(this.form.date, 'YYYY-MM-DD').isSameOrAfter(today)) {
-        this.errors.push('La fecha debe ser superior al día de hoy.')
-      }
-      console.log(this.errors)
-      if (this.errors.length > 0) {
+      if (!this.telephoneLenght) {
         return false
       }
-
-      alert(JSON.stringify(this.form))
+      if (!this.datePickedCorrect) {
+        this.$alertify.error('Debe seleccionar una fecha')
+        return false
+      }
+      this.form.center_id = parseInt(this.$route.params.id)
+      appointmentService.loadNewAppointment(this.form, this.$route.params.id).then(response => {
+        setTimeout(() => {
+          this.$alertify.success('La solicitud de nuevo turno ha sido enviada.')
+        }, 500)
+        this.form.email = ''
+        this.form.name = ''
+        this.form.date = null
+        this.form.hour = ''
+        this.appointments = null
+        this.form.center_id = ''
+        this.$router.push({ path: '/centers' })
+      }).catch(error => {
+        console.log(error)
+        var message = ''
+        for (const [key, err] of Object.entries(error.data.errors)) {
+          message += `${key}: ${err}`
+        }
+        setTimeout(() => {
+          this.$alertify.alert('Errores', message)
+        }, 500)
+      })
     },
     onReset (evt) {
       evt.preventDefault()
+      console.log('reset')
       // Reset our form values
       this.form.email = ''
       this.form.name = ''
-      this.form.food = null
-      this.form.checked = []
-      // Trick to reset/clear native browser form validation state
-      this.show = false
-      this.$nextTick(() => {
-        this.show = true
-      })
+      this.form.date = null
+      this.form.hour = ''
+      this.appointments = null
+      this.form.center_id = ''
     },
     validEmail: function (email) {
       var re = /^(([^<>()\]\\.,;:\s@"]+(\.[^<>()\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,24}))$/
       return re.test(email)
     },
     apptSelected (value) {
-      this.form.appointment = value
-      this.$alertify.success(this.form.appointment)
+      this.form.hour = value
+      this.$alertify.success(this.form.hour)
     }
-    /*
-    getAppointments () {
-      centerService.getAppointments(this.$route.params.id, '29/11/2020').then((data) => {
-      })
-    }
-    */
-    /*
-    handleFileUpload () {
-      this.file = this.$refs.file.files[0]
-    }
-    */
   },
   mounted () {
     const centerId = parseInt(this.$route.params.id, 10)
